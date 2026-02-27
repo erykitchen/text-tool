@@ -1,151 +1,71 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>キャラ設定ジェネレーター Pro</title>
-    <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f0f2f5; color: #333; }
-        .card { background: white; padding: 25px; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #1a73e8; text-align: center; }
-        .setting-row { margin-bottom: 15px; display: flex; align-items: center; flex-wrap: wrap; }
-        .setting-row label { width: 180px; font-weight: bold; }
-        input[type="text"], input[type="password"], select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; flex: 1; min-width: 200px; }
-        .radio-group { display: flex; gap: 15px; }
-        button { background: #1a73e8; color: white; border: none; padding: 12px 25px; cursor: pointer; border-radius: 6px; font-size: 16px; width: 100%; transition: 0.3s; }
-        button:hover { background: #1557b0; }
-        button:disabled { background: #ccc; }
-        #output { white-space: pre-wrap; background: #282c34; color: #abb2bf; padding: 20px; border-radius: 8px; font-family: monospace; line-height: 1.6; min-height: 200px; margin-top: 20px; }
-        .status { text-align: center; margin-top: 10px; font-weight: bold; color: #1a73e8; }
-    </style>
-</head>
-<body>
+import { useState } from 'react';
 
-<h1>Character Generator Pro</h1>
+export default function Home() {
+  const [theme, setTheme] = useState('');
+  const [tone, setTone] = useState('タメ語');
+  const [emoji, setEmoji] = useState('適宜使用する');
+  const [template, setTemplate] = useState('');
+  const [output, setOutput] = useState('お手本を読み込み、生成ボタンを押してください。');
+  const [loading, setLoading] = useState(false);
 
-<div class="card">
-    <div class="setting-row">
-        <label>1. OpenAI API Key</label>
-        <input type="password" id="apiKey" placeholder="sk-...">
-    </div>
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (event) => setTemplate(event.target.result);
+    reader.readAsText(file);
+  };
 
-    <div class="setting-row">
-        <label>2. お手本ファイル (.txt)</label>
-        <input type="file" id="fileInput" accept=".txt">
-    </div>
+  const generate = async () => {
+    if (!template) return alert("お手本ファイルをアップロードしてください");
+    setLoading(true);
+    setOutput("生成中...");
 
-    <div class="setting-row">
-        <label>3. 生成テーマ</label>
-        <input type="text" id="theme" placeholder="例：地雷系の女子大生、厳しい女上司">
-    </div>
-
-    <div class="setting-row">
-        <label>4. 口調の選択</label>
-        <div class="radio-group">
-            <label><input type="radio" name="tone" value="タメ語" checked> タメ語</label>
-            <label><input type="radio" name="tone" value="丁寧な敬語"> 敬語</label>
-        </div>
-    </div>
-
-    <div class="setting-row">
-        <label>5. 絵文字</label>
-        <div class="radio-group">
-            <label><input type="radio" name="emoji" value="適宜使用する" checked> あり</label>
-            <label><input type="radio" name="emoji" value="一切使用しない"> なし</label>
-        </div>
-    </div>
-
-    <button onclick="generate()" id="genBtn">新規キャラクターを生成</button>
-    <div id="status" class="status"></div>
-</div>
-
-<div class="card">
-    <h3>生成結果</h3>
-    <div id="output">お手本を読み込み、生成ボタンを押してください。</div>
-</div>
-
-<script>
-    let templateContent = "";
-
-    // ファイル読み込み処理
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            templateContent = e.target.result;
-            document.getElementById('status').innerText = "お手本ファイルを読み込みました ✅";
-        };
-        reader.readAsText(file);
-    });
-
-    async function generate() {
-        const apiKey = document.getElementById('apiKey').value;
-        const theme = document.getElementById('theme').value || "新しいキャラクター";
-        const tone = document.querySelector('input[name="tone"]:checked').value;
-        const emoji = document.querySelector('input[name="emoji"]:checked').value;
-        const btn = document.getElementById('genBtn');
-        const output = document.getElementById('output');
-        const status = document.getElementById('status');
-
-        if (!apiKey) { alert("APIキーを入力してください"); return; }
-        if (!templateContent) { alert("お手本となるテキストファイルをアップロードしてください"); return; }
-
-        btn.disabled = true;
-        status.innerText = "AIが思考中...（約30秒ほどかかります）";
-        output.innerText = "生成中...";
-
-        try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: "gpt-4o-mini", // 最新の高精度モデルを使用
-                    messages: [
-                        {
-                            role: "system",
-                            content: `あなたはプロのシナリオライターです。ユーザーから渡されるテキストファイルのフォーマット（項目名や区切り線）を100%忠実に守り、新しいキャラクター設定を生成してください。`
-                        },
-                        {
-                            role: "user",
-                            content: `
-以下の条件で、新しいキャラクターを1人生成してください。
-
-■条件：
-1. テーマ: ${theme}
-2. 口調: ${tone}
-3. 絵文字: ${emoji}
-
-■守るべきフォーマット（お手本）:
-${templateContent}
-
-※注意:
-・「■キャラ名」「■アタック」「■返信」などの項目名は必ず維持してください。
-・指示された「口調」と「絵文字の有無」を、アタックや返信のセリフすべてに反映させてください。
-`
-                        }
-                    ],
-                    temperature: 0.7
-                })
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-            
-            output.innerText = data.choices[0].message.content;
-            status.innerText = "生成完了！ ✨";
-        } catch (error) {
-            output.innerText = "エラーが発生しました:\n" + error.message;
-            status.innerText = "エラー終了 ❌";
-        } finally {
-            btn.disabled = false;
-        }
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme, tone, emoji, template }),
+      });
+      const data = await res.json();
+      setOutput(data.result || data.error);
+    } catch (err) {
+      setOutput("エラーが発生しました");
+    } finally {
+      setLoading(false);
     }
-</script>
+  };
 
-</body>
-
-</html>
+  return (
+    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif' }}>
+      <h1>キャラ設定ジェネレーター Pro</h1>
+      <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px' }}>
+        <div style={{ marginBottom: '15px' }}>
+          <label>お手本ファイル: </label>
+          <input type="file" onChange={handleFileUpload} accept=".txt" />
+        </div>
+        <div style={{ marginBottom: '15px' }}>
+          <label>テーマ: </label>
+          <input type="text" value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="例：ツンデレ女子高生" style={{ width: '70%' }} />
+        </div>
+        <div style={{ marginBottom: '15px' }}>
+          <label>口調: </label>
+          <select value={tone} onChange={(e) => setTone(e.target.value)}>
+            <option value="タメ語">タメ語</option>
+            <option value="丁寧な敬語">敬語</option>
+          </select>
+          <label style={{ marginLeft: '20px' }}>絵文字: </label>
+          <select value={emoji} onChange={(e) => setEmoji(e.target.value)}>
+            <option value="適宜使用する">あり</option>
+            <option value="一切使用しない">なし</option>
+          </select>
+        </div>
+        <button onClick={generate} disabled={loading} style={{ width: '100%', padding: '10px', background: '#0070f3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+          {loading ? '生成中...' : '新規キャラクターを生成'}
+        </button>
+      </div>
+      <div style={{ marginTop: '20px', whiteSpace: 'pre-wrap', background: '#333', color: '#fff', padding: '20px', borderRadius: '10px' }}>
+        {output}
+      </div>
+    </div>
+  );
+}
