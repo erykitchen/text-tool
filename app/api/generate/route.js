@@ -24,53 +24,46 @@ export async function POST(req) {
 
     const refPath = path.join(process.cwd(), 'data', 'reference.txt');
     let referenceData = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf8') : "";
-
-    // お手本の中の「○○さん」を、AIが真似しないよう「空欄」に置換
     referenceData = referenceData.replace(/○○さん/g, "　");
 
     const prompt = `
-### 【データ構築の絶対ルール：背いた場合はエラー】
-1. **アタック(1-3)での名前呼びは【死罪】**:
-   - アタック文中に「%send_nickname%」「君」「あなた」「そちら」等の、特定の相手を指し示す言葉を含めることを【厳禁】とする。
-   - ⭕ 良い質問：「最近はどんな映画を観た？」「美味しいお店とか知ってるかな？」
-   - ❌ 悪い質問：「%send_nickname%は何が好き？」「君はどう思う？」
-   - 相手の名前（変数）を入れずに問いかけを完結させよ。
+### 【絶対命令】
+1. **アタック(1-3)**: 相手を呼ぶ言葉（%send_nickname%、あなた、君、そっち、○○さん等）を【1文字も使用禁止】。
+   - 名前を呼ばずに「甘いものは好き？」「休日は何してる？」と聞け。
+2. **返信(1-3)**: 必ず【%send_nickname%】を使って呼べ。
+3. **体重**: 【43〜50kg】厳守。
+4. **URL**: インスタURL行は【完全な空行】。
+5. **文章量**: 各セリフ【3行以上】。
 
-2. **返信(1-3)での名前呼びは【必須】**:
-   - 返信では必ず【%send_nickname%】を使い、親密に呼びかけよ。
-
-3. **体格制限**: 体重は必ず【43kg〜50kg】。51以上は禁止。
-
-4. **URL抹消**: インスタURL行は文字なしの【完全な空行】にせよ。
-
-5. **文章量**: 全セリフ【3行以上】。
-
-### 【お手本フォーマット（項目と順序を死守）】
+### 【お手本】
 ${referenceData}
 
----
-
 ### 【設定】
-- 職業: ${finalJob}
-- 性格: ${finalPersonality}
-- 口調: ${tone === 'polite' ? '敬語' : 'タメ語'}
-- 性別: 女性
+職業:${finalJob} / 性格:${finalPersonality} / 口調:${tone === 'polite' ? '敬語' : 'タメ語'} / 性別:女性
 `;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { 
-          role: "system", 
-          content: "精密データ作成機。アタック1-3で相手を名前(%send_nickname%等)で呼ぶことはシステムエラーとして禁止。返信は%send_nickname%必須。体重50以下。" 
-        },
-        { role: "user", content: prompt }
+        { role: "system", content: "精密データ作成機。アタックでの名前呼びは致命的バグ。返信は名前呼び必須。体重50以下。" }
       ],
       temperature: 0.7, 
     });
 
+    let resultText = response.choices[0].message.content;
+
+    // ★【物理フィルター】アタックセクション内から名前呼びを強制除去
+    // アタック1〜3の範囲を特定し、もし名前呼びが含まれていたら消去・置換する処理
+    const attackMatch = resultText.match(/【アタック1】[\s\S]*【アタック3】[\s\S]*?(?=\n\n|---|$)/);
+    if (attackMatch) {
+      let filteredAttack = attackMatch[0]
+        .replace(/%send_nickname%(は|も|が|って)/g, "") // 「名前は」などを消す
+        .replace(/%send_nickname%/g, ""); // 単体の名前も消す
+      resultText = resultText.replace(attackMatch[0], filteredAttack);
+    }
+
     return NextResponse.json({ 
-      result: response.choices[0].message.content,
+      result: resultText,
       selectedJob: finalJob,
       selectedPersonality: finalPersonality
     });
