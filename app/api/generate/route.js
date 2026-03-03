@@ -19,41 +19,46 @@ export async function POST(req) {
   try {
     const { job, personality, tone, template } = await req.json();
 
-    const finalJob = (!job || job === 'random') ? (getRandomLine('jobs.txt') || 'デザイナー') : job;
-    const finalPersonality = (!personality || personality === 'random') ? (getRandomLine('personalities.txt') || '明るい') : personality;
+    const finalJob = (!job || job === 'random') ? (getRandomLine('jobs.txt') || '女子大生') : job;
+    const finalPersonality = (!personality || personality === 'random') ? (getRandomLine('personalities.txt') || 'おっとり') : personality;
 
     const refPath = path.join(process.cwd(), 'data', 'reference.txt');
     const referenceData = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf8') : "";
 
     const prompt = `
-### 【絶対遵守命令：データ変換エンジン】
-1. キャラクターは【必ず女性】。
-2. 【文章量】: 1つ1つのセリフ（アタック、返信等）は【最低3行以上】で構成せよ。状況描写、感情、相手への問いかけを混ぜ、読み応えのある長さにすること。
-3. 【URLの抹消】: インスタURL等の「https://」で始まるURLは【絶対に出力禁止】。URLが書かれていた行は【完全な空行（改行のみ）】にせよ。
-4. 【アタックでの名前禁止】: 【アタック1〜3】の中では、相手の名前（%send_nickname%等）を【絶対に呼ぶな】。
-5. 【返信での名前固定】: 返信(1-3)内の相手の呼び名は必ず【%send_nickname%】に置換せよ。
+### 【警告：あなたはデータ作成機です】
+ユーザーが入力した「プロフィール（エリスなど）」は、セリフを作るための「材料」に過ぎません。
+【お手本】の形式を無視して、キャラクター紹介や解説を書くことは【絶対禁止】です。
 
-### 【お手本フォーマット】
+### 【死守ルール】
+1. キャラクターは【必ず女性】。
+2. 出力項目は、以下の【お手本】にある項目（■キャラ名、アタック1-3、返信1-3等）を【1文字も変えず】にそのまま使用せよ。
+3. セリフ1つにつき【必ず3行以上】のボリュームを持たせること。
+4. 【インスタURL】の行は、文字を消して必ず【完全な空行】にせよ。
+5. 【アタック1〜3】の中では、相手の名前（%send_nickname%等）を【絶対に呼ぶな】。
+6. 返信内の呼び名は【%send_nickname%】で固定せよ。
+
+### 【お手本フォーマット（この形式・記号・順序を100%コピーせよ）】
 ${referenceData}
 
 ---
 
-### 【設定・口調】
-- 職業: ${finalJob}
-- 性格: ${finalPersonality}
+### 【今回の材料（セリフ内容に反映せよ）】
+- 職業/設定: ${finalJob}
+- 性格/特徴: ${finalPersonality}
 - 口調: ${tone === 'polite' ? '敬語' : 'タメ語'}
-
-### 【出力指示】
-お手本の「■キャラ名」からの形式を完コピし、中身だけを上記の設定で書き換えよ。
-紹介文や解説は一切不要。データのみを出力せよ。
 `;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "女性キャラデータ作成機。セリフは1つにつき3行以上のボリュームを持たせること。URLは空行。アタックで名前を呼ぶのは禁止。" }
+        { 
+          role: "system", 
+          content: "あなたは指示された性格の女性になりきり、指定のデータ形式（■キャラ名〜）を埋める精密なプログラムです。紹介文や挨拶は一切禁止。■キャラ名 から開始してください。" 
+        },
+        { role: "user", content: prompt }
       ],
-      temperature: 0.8, // 表現を豊かにするため少し上げました
+      temperature: 0.8, 
     });
 
     return NextResponse.json({ 
