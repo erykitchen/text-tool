@@ -30,7 +30,7 @@ export default function Home() {
     setOutput("");
 
     try {
-      const res = await fetch(`${window.location.origin}/api/generate`, {
+      const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
