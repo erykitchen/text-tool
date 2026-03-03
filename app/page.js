@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 export default function GeneratorPage() {
   const [job, setJob] = useState('');
   const [personality, setPersonality] = useState('');
-  const [tone, setTone] = useState('polite'); // 口調管理
+  const [tone, setTone] = useState('polite'); // 敬語・タメ語スイッチ
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedInfo, setSelectedInfo] = useState(null);
@@ -36,7 +36,7 @@ export default function GeneratorPage() {
       const newHistory = [{ ...info, content: data.result }, ...history].slice(0, 20);
       setHistory(newHistory);
       localStorage.setItem('gen_history', JSON.stringify(newHistory));
-    } catch (e) { alert("失敗しました"); }
+    } catch (e) { alert("生成に失敗しました"); }
     setLoading(false);
   };
 
@@ -49,7 +49,7 @@ export default function GeneratorPage() {
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
           {history.map((item, i) => (
-            <button key={i} onClick={() => {setResult(item.content); setSelectedInfo(item);}} style={{ width: '100%', textAlign: 'left', padding: '12px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', marginBottom: '4px' }}>
+            <button key={i} onClick={() => {setResult(item.content); setSelectedInfo(item);}} style={{ width: '100%', textAlign: 'left', padding: '12px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', marginBottom: '4px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#334155'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
               <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{item.job}</div>
               <div style={{ fontSize: '10px', color: '#64748b' }}>{item.personality}</div>
             </button>
@@ -57,23 +57,23 @@ export default function GeneratorPage() {
         </div>
       </aside>
 
-      {/* メイン */}
+      {/* メインエリア */}
       <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <header style={{ marginBottom: '32px' }}>
-            <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#22d3ee', margin: '0' }}>キャラ・アーキテクト</h1>
+            <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#22d3ee', margin: 0 }}>キャラ・アーキテクト</h1>
           </header>
 
           <div style={{ backgroundColor: '#1e293b80', border: '1px solid #334155', padding: '24px', borderRadius: '16px', marginBottom: '32px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-              <input type="text" placeholder="職業 (ランダム)" value={job} onChange={(e) => setJob(e.target.value)} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', color: '#fff' }} />
-              <input type="text" placeholder="性格 (ランダム)" value={personality} onChange={(e) => setPersonality(e.target.value)} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', color: '#fff' }} />
+              <input type="text" placeholder="職業 (ランダム)" value={job} onChange={(e) => setJob(e.target.value)} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '14px' }} />
+              <input type="text" placeholder="性格 (ランダム)" value={personality} onChange={(e) => setPersonality(e.target.value)} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '14px' }} />
               <select value={tone} onChange={(e) => setTone(e.target.value)} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', color: '#fff', cursor: 'pointer' }}>
                 <option value="polite">敬語</option>
                 <option value="casual">タメ語</option>
               </select>
             </div>
-            <button onClick={generate} style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#0891b2', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
+            <button onClick={generate} style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#0891b2', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>
               {loading ? "ARCHITECTING..." : "新しいキャラクターを生成"}
             </button>
           </div>
@@ -81,8 +81,8 @@ export default function GeneratorPage() {
           {result && (
             <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#22d3ee' }}>ACTIVE: {selectedInfo?.job}</span>
-                <button onClick={() => {navigator.clipboard.writeText(result); alert('コピー！');}} style={{ fontSize: '10px', backgroundColor: '#334155', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer' }}>コピー</button>
+                <span style={{ fontSize: '12px', color: '#22d3ee' }}>展開中: {selectedInfo?.job}</span>
+                <button onClick={() => {navigator.clipboard.writeText(result); alert('コピーしました');}} style={{ fontSize: '10px', backgroundColor: '#334155', border: 'none', borderRadius: '4px', color: '#fff', padding: '4px 12px', cursor: 'pointer' }}>コピー</button>
               </div>
               <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', padding: '32px', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', color: '#e2e8f0', fontFamily: 'monospace' }}>{result}</pre>
