@@ -23,21 +23,27 @@ export default function Home() {
     setLoading(true);
     setOutput("生成中...");
 
-    try {
+try {
       const res = await fetch(`${window.location.origin}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ theme, tone, emoji, template }),
       });
+
+      // --- ここから追加 ---
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({})); 
+        throw new Error(errorData.error || `サーバーエラー (ステータス: ${res.status})`);
+      }
+      // --- ここまで追加 ---
+
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
       setOutput(data.result);
     } catch (err) {
       setOutput("エラーが発生しました: " + err.message);
     } finally {
       setLoading(false);
     }
-  };
 
   return (
     <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#fff', borderRadius: '15px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
