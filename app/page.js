@@ -24,7 +24,7 @@ export default function Home() {
     setOutput("生成中...");
 
     try {
-      const res = await fetch('/api/generate', {
+      const res = await fetch(`${window.location.origin}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ theme, tone, emoji, template }),
