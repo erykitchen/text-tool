@@ -19,33 +19,33 @@ export async function POST(req) {
   try {
     const { job, personality, tone, template } = await req.json();
 
-    const finalJob = (!job || job === 'random') ? (getRandomLine('jobs.txt') || '女子大生') : job;
-    const finalPersonality = (!personality || personality === 'random') ? (getRandomLine('personalities.txt') || 'おっとり') : personality;
+    const finalJob = (!job || job === 'random') ? (getRandomLine('jobs.txt') || 'デザイナー') : job;
+    const finalPersonality = (!personality || personality === 'random') ? (getRandomLine('personalities.txt') || '明るい') : personality;
 
     const refPath = path.join(process.cwd(), 'data', 'reference.txt');
     const referenceData = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf8') : "";
 
     const prompt = `
-### 【警告：あなたはデータ作成機です】
-ユーザーが入力した「プロフィール（エリスなど）」は、セリフを作るための「材料」に過ぎません。
-【お手本】の形式を無視して、キャラクター紹介や解説を書くことは【絶対禁止】です。
+### 【最優先：絶対厳守ルール】
+1. **アタックの禁止事項**: 【アタック1】【アタック2】【アタック3】の文章内で、相手を呼ぶこと（%send_nickname%、あなた、君、○○さん等）を【完全に禁止】する。
+   - 悪い例：「%send_nickname%はどう思う？」「%send_nickname%に会いたいな」
+   - 良い例：「私はこう思うな」「今日はこんなことがあったよ」「誰か聞いてくれるかな」
+   - アタックは、主語を自分にするか、一般論にするか、相手を特定しない独り言形式にせよ。
 
-### 【死守ルール】
-1. キャラクターは【必ず女性】。
-2. 出力項目は、以下の【お手本】にある項目（■キャラ名、アタック1-3、返信1-3等）を【1文字も変えず】にそのまま使用せよ。
-3. セリフ1つにつき【必ず3行以上】のボリュームを持たせること。
-4. 【インスタURL】の行は、文字を消して必ず【完全な空行】にせよ。
-5. 【アタック1〜3】の中では、相手の名前（%send_nickname%等）を【絶対に呼ぶな】。
-6. 返信内の呼び名は【%send_nickname%】で固定せよ。
+2. **返信のルール**: 【返信1〜3】内では、逆に必ず【%send_nickname%】を使い、相手の名前を呼べ。
 
-### 【お手本フォーマット（この形式・記号・順序を100%コピーせよ）】
+3. **URLの抹消**: インスタURL等のリンクは絶対に出力せず、その行は【完全な空行】にせよ。
+
+4. **文章量**: すべてのセリフを【3行以上】で構成せよ。
+
+### 【お手本フォーマット（形式・項目・順序を完コピせよ）】
 ${referenceData}
 
 ---
 
-### 【今回の材料（セリフ内容に反映せよ）】
-- 職業/設定: ${finalJob}
-- 性格/特徴: ${finalPersonality}
+### 【設定材料】
+- 職業: ${finalJob}
+- 性格: ${finalPersonality}
 - 口調: ${tone === 'polite' ? '敬語' : 'タメ語'}
 `;
 
@@ -54,11 +54,11 @@ ${referenceData}
       messages: [
         { 
           role: "system", 
-          content: "あなたは指示された性格の女性になりきり、指定のデータ形式（■キャラ名〜）を埋める精密なプログラムです。紹介文や挨拶は一切禁止。■キャラ名 から開始してください。" 
+          content: "女性キャラデータ作成機。アタック1-3では相手(名前)に一切言及するな。自分の話だけを3行以上書け。URLは空行。返信は%send_nickname%必須。" 
         },
         { role: "user", content: prompt }
       ],
-      temperature: 0.8, 
+      temperature: 0.7, 
     });
 
     return NextResponse.json({ 
