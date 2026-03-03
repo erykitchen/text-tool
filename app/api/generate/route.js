@@ -12,7 +12,6 @@ const getRandomLine = (fileName) => {
   if (!fs.existsSync(filePath)) return null;
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
-  // Math.floor に修正しました
   return lines.length > 0 ? lines[Math.floor(Math.random() * lines.length)] : null;
 };
 
@@ -26,24 +25,32 @@ export async function POST(req) {
     const refPath = path.join(process.cwd(), 'data', 'reference.txt');
     let referenceData = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf8') : "";
 
-    // お手本から「○○さん」を消去し、AIの誤用を物理的に防ぐ
-    referenceData = referenceData.replace(/○○さん/g, "[名前呼び禁止/返信時のみ%send_nickname%を使用]");
+    // お手本の中の「○○さん」を、AIが真似しないよう「空欄」に置換
+    referenceData = referenceData.replace(/○○さん/g, "　");
 
     const prompt = `
-### 【絶対遵守命令：データ構築エンジン】
-1. **体格制限**: 体重は必ず【43kg〜50kg】の範囲内で設定せよ。51kg以上は絶対に出力するな。
-2. **アタック(1-3)禁止事項**: 相手を呼ぶ言葉（%send_nickname%、あなた、君、○○さん等）を【一切使うな】。
-   - 名前を呼ばない「質問」は積極的に行え。（例：「最近のマイブームは何？」「おすすめの場所はある？」）
-3. **返信(1-3)必須事項**: 相手の呼び名は100%【%send_nickname%】を使用せよ。
-4. **URL抹消**: インスタURL等のリンク行は、文字を入れず【完全な空行】にせよ。
-5. **文章量**: すべてのセリフ（アタック・返信）を【3行以上】で構成せよ。
+### 【データ構築の絶対ルール：背いた場合はエラー】
+1. **アタック(1-3)での名前呼びは【死罪】**:
+   - アタック文中に「%send_nickname%」「君」「あなた」「そちら」等の、特定の相手を指し示す言葉を含めることを【厳禁】とする。
+   - ⭕ 良い質問：「最近はどんな映画を観た？」「美味しいお店とか知ってるかな？」
+   - ❌ 悪い質問：「%send_nickname%は何が好き？」「君はどう思う？」
+   - 相手の名前（変数）を入れずに問いかけを完結させよ。
 
-### 【お手本フォーマット（形式・項目・順序を完コピ）】
+2. **返信(1-3)での名前呼びは【必須】**:
+   - 返信では必ず【%send_nickname%】を使い、親密に呼びかけよ。
+
+3. **体格制限**: 体重は必ず【43kg〜50kg】。51以上は禁止。
+
+4. **URL抹消**: インスタURL行は文字なしの【完全な空行】にせよ。
+
+5. **文章量**: 全セリフ【3行以上】。
+
+### 【お手本フォーマット（項目と順序を死守）】
 ${referenceData}
 
 ---
 
-### 【設定材料】
+### 【設定】
 - 職業: ${finalJob}
 - 性格: ${finalPersonality}
 - 口調: ${tone === 'polite' ? '敬語' : 'タメ語'}
@@ -55,7 +62,7 @@ ${referenceData}
       messages: [
         { 
           role: "system", 
-          content: "女性キャラデータ作成機。体重は50以下。アタックで名前呼び厳禁。返信は%send_nickname%必須。URLは空行。各セリフ3行以上。" 
+          content: "精密データ作成機。アタック1-3で相手を名前(%send_nickname%等)で呼ぶことはシステムエラーとして禁止。返信は%send_nickname%必須。体重50以下。" 
         },
         { role: "user", content: prompt }
       ],
