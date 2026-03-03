@@ -17,38 +17,40 @@ const getRandomLine = (fileName) => {
 
 export async function POST(req) {
   try {
-    let { job, personality, tone, emoji, template } = await req.json();
+    let { job, personality, tone, template } = await req.json();
 
-    // ランダム抽選
+    // ランダム決定
     if (!job || job === 'random') job = getRandomLine('jobs.txt') || 'アパレル店員';
     if (!personality || personality === 'random') personality = getRandomLine('personalities.txt') || '元気いっぱい';
 
-    // お手本ファイルの読み込み
+    // 文章の長さをランダムで決定（短め・普通・長め）
+    const lengths = ["簡潔に", "標準的な長さで", "たっぷりと詳細に"];
+    const chosenLength = lengths[Math.floor(Math.random() * lengths.length)];
+
     const refPath = path.join(process.cwd(), 'data', 'reference.txt');
     const referenceData = fs.existsSync(refPath) ? fs.readFileSync(refPath, 'utf8') : "";
 
     const prompt = `
-### 【絶対遵守のシステム命令】
-1. キャラクターは【必ず女性】として作成すること。
-2. お手本ファイルの中に「http」で始まるURLが含まれていても、それは【無視】せよ。
-3. 出力する際、URLが記載されている行（またはURLを入れるべき場所）は、文字を一切入れず、必ず【完全な空行】にすること。
+### 【最優先指令】
+1. キャラクターは【必ず女性】にすること。
+2. 口調は必ず【${tone === 'polite' ? '敬語（です・ます調）' : 'タメ語（親和性の高い口語）'}】にせよ。
+3. 文章のボリュームは【${chosenLength}】作成せよ。特に「長め」の指示の場合は、セリフの背景や感情表現を豊かに膨らませること。
+4. 下記の【お手本ファイル】の形式・構成を【1文字の狂いもなく】継承せよ。URLは必ず【完全な空行】にせよ。
 
-### 【お手本ファイル（URLが含まれていますが、出力時は空行にしてください）】
+### 【お手本ファイル】
 ${referenceData}
 
 ---
 
 ### 【今回の作成依頼】
-上記お手本の「構成・変数・ノリ」を継承し、以下の設定で【女性キャラクター】を1人分作成してください。
 - 職業: ${job}
 - 性格: ${personality}
 - 口調: ${tone === 'polite' ? '敬語' : 'タメ語'}
-- 装飾: ${emoji}
 
-### 【データ構造の鉄則】
-- **名前の変数**: 返信(1-3)内では必ず「%send_nickname%」と呼ぶこと。
-- **アタック(1-3)**: 相手の名前を絶対に呼ばないこと。
-- **URL行**: 重ねて命じるが、URLを含む行は【空行】にせよ。絶対にURLを捏造したり、お手本からコピーしてはならない。
+### 【鉄則】
+- 名前: アタックは名前禁止。返信は必ず「%send_nickname%」を使う。
+- URL: 絶対に出力禁止。URL行は「空行」にすること。
+- 変化: ${chosenLength}という指示に従い、毎回文章の量や言い回しに変化をつけ、読み応えのある内容にせよ。
 
 ### 【出力フォーマット】
 ${template}
@@ -57,13 +59,9 @@ ${template}
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { 
-          role: "system", 
-          content: "あなたはURLを検知して削除し、女性キャラクターのデータを作成する専用マシンです。お手本にURLがあっても、あなたはそれを無視して空行として出力します。" 
-        },
-        { role: "user", content: prompt }
+        { role: "system", content: "データ作成機。女性限定。URLは空行。指定された口調と長さを厳守。" }
       ],
-      temperature: 0.7, 
+      temperature: 0.85, // 表現の幅を広げるため少し上げる
     });
 
     return NextResponse.json({ 
