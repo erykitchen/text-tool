@@ -71,7 +71,7 @@ export default function Home() {
           </div>
         </div>
 
-        <button onClick={generate} disabled={loading} style={{ width: '100%', padding: '12px', background: '#0070f3', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>
+        <button type="button" onClick={generate} disabled={loading} style={{ width: '100%', padding: '12px', background: '#0070f3', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>
           {loading ? 'AIが生成中...' : '新規キャラクターを生成'}
         </button>
       </div>
