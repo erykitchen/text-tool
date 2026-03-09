@@ -4,18 +4,15 @@ import fs from "fs";
 import path from "path";
 
 export async function POST(req) {
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
     const { theme, tone, emoji } = await req.json();
-
-    const getData = (fileName) => {
-      const filePath = path.join(process.cwd(), "data", fileName);
-      const data = fs.readFileSync(filePath, "utf8");
-      const list = data.split(/\r?\n/).filter(line => line.trim() !== "");
-      return list[Math.floor(Math.random() * list.length)];
+    const getData = (f) => {
+      const p = path.join(process.cwd(), "data", f);
+      const d = fs.readFileSync(p, "utf8");
+      const l = d.split(/\r?\n/).filter(line => line.trim() !== "");
+      return l[Math.floor(Math.random() * l.length)];
     };
 
     const name = getData("names.txt");
@@ -29,60 +26,42 @@ export async function POST(req) {
           role: "system", 
           content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
-1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
-2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
+1. キャラ名は必ず「${name}」を使用。
+2. 全てのセリフの文末は必ず「？」で終わらせること。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
 4. 全角・半角スペースは一切使用禁止。
-5. 項目11(■返信3-青1)を書き出すまで出力を絶対に止めないこと。` 
+5. ■返信3-青1まで一文字も省略せず書き出すこと。` 
         },
         { 
           role: "user", 
-          content: `
-### 【任務】
-以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
-
-■設定: 名前:${name} / 職業:${job} / 性格:${personality} / テーマ:${theme} / 絵文字:${emoji}
-
-■出力シーケンス:
-1. ■キャラ名：${name}
-2. ■プロフィール
-3. ■自己紹介
-4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
-5. 【アタック1〜3】（※名前禁止 / 末尾は「？」）
-6. ■返信1（※呼び名は%send_nickname% / 末尾は「？」）
-7. ■返信1-青1（※末尾は「？」）
-8. ■返信2（※呼び名は%send_nickname% / 末尾は「？」）
-9. ■返信2-青1（※末尾は「？」）
-10. ■返信3（※呼び名は%send_nickname% / 末尾は「？」）
-11. ■返信3-青1（※絶対に省略禁止。末尾は必ず「？」）
-12. 【以上、全項目出力完了】`
+          content: `12項目（■キャラ名〜完了報告まで）を順番に出力してください。名前は${name}。一文字も省略禁止。` 
         }
       ],
-      temperature: 0.7, // 青1が出た時の数値に戻しました
+      temperature: 0.7,
       max_tokens: 4000, 
     });
 
     let rawText = completion.choices[0]?.message?.content || "";
 
-    // --- 【後処理：プロンプトの成功を壊さず、ゴミだけ消す】 ---
+    // --- 【物理クリーンアップ：ここからが本番】 ---
     
-    // 1. 各行の末尾の空白（半角・全角）を物理的に即削除
-    let result = rawText.split('\n')
-      .map(line => line.replace(/[ 　\t]+$/, "")) 
-      .join('\n');
+    // 1. 各行の末尾にある空白（半角・全角）を物理的に1ミリも残さず消去
+    let lines = rawText.split('\n').map(line => line.replace(/[ 　\t]+$/, ""));
+    
+    // 2. 呼び名間違いを修正
+    let result = lines.join('\n').replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 2. 呼び名修正
-    result = result.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
-
-    // 3. 【死守ロジック】判定は「空白全消し状態」で行い、青1がなければ強制追加
-    const flatCheck = result.replace(/[\s　]/g, "");
-    if (!flatCheck.includes("■返信3-青1")) {
-        result += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
-    }
-
-    // 4. 完了報告も物理付与
-    if (!flatCheck.includes("全項目出力完了")) {
-        result += "\n\n【以上、全項目出力完了】";
+    // 3. 【最重要：物理注入】
+    // AIが「■返信3-青1」を書き漏らしていたら、プログラムが強制的に文字を足します。
+    // スペースを除去した状態で判定し、項目名がなければガッチャンコします。
+    const checkText = result.replace(/[\s　]/g, "");
+    
+    if (!checkText.includes("■返信3-青1")) {
+      // 既存のテキストの最後に、強制的に「青1」と「完了報告」を合成
+      result = result.trim() + `\n\n■返信3-青1\nこれからもっと仲良くなれたら嬉しいなって思ってるよ？😊？\n\n【以上、全項目出力完了】`;
+    } else if (!checkText.includes("全項目出力完了")) {
+      // 青1はあるけど完了報告がない場合
+      result = result.trim() + `\n\n【以上、全項目出力完了】`;
     }
 
     return NextResponse.json({ result: result });
