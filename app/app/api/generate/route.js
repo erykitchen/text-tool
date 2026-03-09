@@ -64,22 +64,24 @@ export async function POST(req) {
 
     let resultText = completion.choices[0]?.message?.content || "";
 
-    // --- 【物理的なクリーンアップ & 完走保証ロジック】 ---
+    // --- 【物理的なクリーンアップ（ここを強化）】 ---
     
-    // 1. スペースの除去（全角および行末の半角）
+    // 1. 全角スペースを削除
     resultText = resultText.replace(/　/g, "");
-    resultText = resultText.split('\n').map(line => line.trimEnd()).join('\n').replace(/  /g, "");
 
-    // 2. 呼び名間違いの修正
+    // 2. 【強化】行末のあらゆる空白（半角、タブ、全角、連続スペース）を1行ずつ徹底削除
+    resultText = resultText
+      .split('\n')
+      .map(line => line.replace(/[\s　]+$/, "")) // 行末の空白のみを削除
+      .join('\n');
+
+    // 3. 呼び名間違いの修正
     resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【最重要】「返信3-青1」の欠落を物理的に検知・補完する
+    // 4. 【完走保証】青1と完了報告の物理補完（死守ロジック）
     if (!resultText.includes("■返信3-青1")) {
-        const extraBlue = `\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ！😊？\nこれからも仲良くしてくれるかな？✨？`;
-        resultText += extraBlue;
+        resultText += `\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？✨？`;
     }
-
-    // 4. 「完了報告」の強制付与
     if (!resultText.includes("【以上、全項目出力完了】")) {
         resultText += "\n\n【以上、全項目出力完了】";
     }
