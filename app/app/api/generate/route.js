@@ -22,62 +22,63 @@ export async function POST(req) {
     const selectedPersonality = getData("personalities.txt");
     const selectedJob = getData("jobs.txt");
 
-    const refFilePath = path.join(process.cwd(), "data", "reference.txt");
-    const fullReferenceData = fs.readFileSync(refFilePath, "utf8");
+    // 【重要】お手本は「構成の型」としてのみ利用し、中身はAIに直接見せない
+    const fixedFormat = `
+■キャラ名
+■生年月日
+■身長
+■体重
+■自己紹介
+--------------------------------------
+キャラ設定
+カップ数：
+名前：${selectedName}
+職業：${selectedJob}
+設定：${selectedPersonality}
+テーマ：${theme}
+絵文字：${emoji}
+--------------------------------------
+【アタック1】
+【アタック2】
+【アタック3】
+--------------------------------------
+■返信1
+■返信1-青1
+■返信2
+■返信2-青1
+■返信3
+■返信3-青1
+【以上、全項目出力完了】`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { 
           role: "system", 
-          content: `あなたはプロのシナリオライターです。今回は【${selectedName}】という名前のキャラクターの新作のみを執筆してください。他の名前、ひらがな表記への変換、捏造は一切禁止です。全てのセリフは必ず「？」で終わらせてください。` 
+          content: "あなたはプロのシナリオライターです。既存のデータの流用は一切禁止されており、提供された『枠組み』を独自の文章で埋めることが仕事です。全ての台詞は必ず『？』で終わらせてください。" 
         },
         { 
           role: "user", 
           content: `
-### 【お手本（構成のルールのみを抽出せよ）】
-${fullReferenceData}
+### 【任務】
+以下の【出力フォーマット】を1文字も省略せず、すべてオリジナルの新作文章で埋めてください。
 
----
+■設定: 名前:${selectedName} / 性格:${selectedPersonality} / 職業:${selectedJob} / テーマ:${theme} / 口調:${tone} / 絵文字:${emoji}
 
-### 【任務：完全新作シナリオの納品】
-お手本の中身は1文字も使わず、以下の【確定設定】で新作を執筆してください。
+■文章ルール:
+1. **丸写し厳禁**: あなた自身の言葉で、${selectedName}らしい魅力的な文章をゼロから書いてください。
+2. **全文疑問形**: アタック、返信、青1、すべてのメッセージの最後は、必ず相手への質問「？」で締めてください。
+3. **話題拡張**: 相手に気に入ってもらえるよう、一文を長く、親身に詳しく書いてください。
 
-■確定設定（厳守）:
-- **名前**: ${selectedName}（※絶対にこの名前を使うこと）
-- **職業**: ${selectedJob}
-- **性格**: ${selectedPersonality}
-- **テーマ**: ${theme}
-- **口調**: ${tone}
-- **絵文字**: ${emoji}
+【出力フォーマット（ここから一文字も漏らさず書き出せ）】
+${fixedFormat}
 
-■執筆の鉄則:
-1. **全メッセージ末尾疑問形**: 全ての台詞の最後は、必ず相手に対する質問「？」で締めてください。
-2. **話題拡張**: 相手に気に入ってもらえるよう、${selectedJob}や${selectedPersonality}の設定を盛り込んで詳しく書いてください。
-3. **未完了の禁止**: 11番の「■返信3-青1」を出力し、最後に「【以上、全項目出力完了】」と書くまでは絶対に生成を終わらせないでください。
-
-■出力必須シーケンス（上から順に、すべて独立した項目として出力せよ）:
-1. ■キャラ名：${selectedName}
-2. ■生年月日
-3. ■身長
-4. ■体重
-5. ■自己紹介
-6. キャラ設定（カップ数、名前:${selectedName}、職業:${selectedJob}、設定:${selectedPersonality}、テーマ:${theme}）
-7. 【アタック1】
-8. 【アタック2】
-9. 【アタック3】
-10. ■返信1、■返信1-青1
-11. ■返信2、■返信2-青1
-12. ■返信3
-13. ■返信3-青1
-14. 【以上、全項目出力完了】
-
-### 【最終命令】
-必ず14番まで出力し、プロの仕事として完璧に納品せよ。` 
+### 【最終確認】
+最後の「【以上、全項目出力完了】」という文字列が出力されていない場合、あなたの報酬は発生しません。プロとして最後まで書き切ってください。` 
         }
       ],
-      temperature: 0.7,
-      max_tokens: 4096, 
+      temperature: 0.8, // 創作性を高め、丸写しを防ぐために少し上げました
+      max_tokens: 4000, 
     });
 
     return NextResponse.json({ result: completion.choices[0].message.content });
