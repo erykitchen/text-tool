@@ -33,7 +33,7 @@ export async function POST(req) {
 2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
 4. 全角スペース（　）は絶対に使用禁止。
-5. 項目11(■返信3-青1)まで一文字も省略せず、最後まで書き切ること。` 
+5. 項目11(■返信3-青1)を書き出すまで出力を絶対に止めないこと。` 
         },
         { 
           role: "user", 
@@ -48,12 +48,12 @@ export async function POST(req) {
 2. ■プロフィール
 3. ■自己紹介
 4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
-5. 【アタック1〜3】（※名前禁止 / 末尾は必ず「？」）
-6. ■返信1（※呼び名は%send_nickname% / 末尾は必ず「？」）
-7. ■返信1-青1（※末尾は必ず「？」）
-8. ■返信2（※呼び名は%send_nickname% / 末尾は必ず「？」）
-9. ■返信2-青1（※末尾は必ず「？」）
-10. ■返信3（※呼び名は%send_nickname% / 末尾は必ず「？」）
+5. 【アタック1〜3】（※名前禁止 / 末尾は「？」）
+6. ■返信1（※呼び名は%send_nickname% / 末尾は「？」）
+7. ■返信1-青1（※末尾は「？」）
+8. ■返信2（※呼び名は%send_nickname% / 末尾は「？」）
+9. ■返信2-青1（※末尾は「？」）
+10. ■返信3（※呼び名は%send_nickname% / 末尾は「？」）
 11. ■返信3-青1（※絶対に省略禁止。末尾は必ず「？」）
 12. 【以上、全項目出力完了】`
         }
@@ -64,28 +64,28 @@ export async function POST(req) {
 
     let rawText = completion.choices[0]?.message?.content || "";
 
-    // 1. 【改行直前のスペースを即消去】
-    let processedText = rawText.split('\n')
-      .map(line => line.replace(/[ 　\t]+$/, "")) // 行末の空白だけを削除
+    // --- 【後処理：ここが生命線です】 ---
+    
+    // 1. 各行の末尾にある不要なスペース（半角・全角）だけを削除し、即改行させる
+    let finalText = rawText.split('\n')
+      .map(line => line.replace(/[ 　\t]+$/, "")) 
       .join('\n');
 
     // 2. 相手の呼び名間違いを修正
-    processedText = processedText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
+    finalText = finalText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【判定用の正規化】判定ミスを防ぐため、スペースや改行を抜いた状態でチェック
-    const checkText = processedText.replace(/[\s　]/g, "");
+    // 3. 【青1・完了報告の死守ロジック】
+    // スペースの有無に左右されないよう、一時的に空白を消した状態でチェック
+    const dryRunCheck = finalText.replace(/[\s　]/g, "");
 
-    // 4. 【死守ロジック：返信3-青1の強制注入】
-    if (!checkText.includes("■返信3-青1")) {
-        processedText += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
+    if (!dryRunCheck.includes("■返信3-青1")) {
+        finalText += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
+    }
+    if (!dryRunCheck.includes("全項目出力完了")) {
+        finalText += "\n\n【以上、全項目出力完了】";
     }
 
-    // 5. 【成功保証：完了報告の強制注入】
-    if (!checkText.includes("以上、全項目出力完了")) {
-        processedText += "\n\n【以上、全項目出力完了】";
-    }
-
-    return NextResponse.json({ result: processedText });
+    return NextResponse.json({ result: finalText });
 
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
