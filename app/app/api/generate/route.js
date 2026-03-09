@@ -30,7 +30,7 @@ export async function POST(req) {
           content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
 1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
-2. 全てのセリフの文末は、必ず「？」で終わらせること（例：😊？）。
+2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
 4. 全角スペース（　）は絶対に使用禁止。
 5. 項目11(■返信3-青1)まで一文字も省略せず、最後まで書き切ること。` 
@@ -48,12 +48,12 @@ export async function POST(req) {
 2. ■プロフィール
 3. ■自己紹介
 4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
-5. 【アタック1〜3】（※名前禁止 / 末尾は「？」）
-6. ■返信1（※呼び名は%send_nickname% / 末尾は「？」）
-7. ■返信1-青1（※末尾は「？」）
-8. ■返信2（※呼び名は%send_nickname% / 末尾は「？」）
-9. ■返信2-青1（※末尾は「？」）
-10. ■返信3（※呼び名は%send_nickname% / 末尾は「？」）
+5. 【アタック1〜3】（※名前禁止 / 末尾は必ず「？」）
+6. ■返信1（※呼び名は%send_nickname% / 末尾は必ず「？」）
+7. ■返信1-青1（※末尾は必ず「？」）
+8. ■返信2（※呼び名は%send_nickname% / 末尾は必ず「？」）
+9. ■返信2-青1（※末尾は必ず「？」）
+10. ■返信3（※呼び名は%send_nickname% / 末尾は必ず「？」）
 11. ■返信3-青1（※絶対に省略禁止。末尾は必ず「？」）
 12. 【以上、全項目出力完了】`
         }
@@ -64,23 +64,24 @@ export async function POST(req) {
 
     let rawText = completion.choices[0]?.message?.content || "";
 
-    // --- 【物理的なクリーンアップ：改行前のスペースのみ削除】 ---
-    
-    // 1. 各行をループして、行末のスペース（半角・全角）だけを削除して即改行
+    // 1. 【改行直前のスペースを即消去】
     let processedText = rawText.split('\n')
-      .map(line => line.replace(/[ 　\t]+$/, "")) // 行末（$）の空白だけを消す
+      .map(line => line.replace(/[ 　\t]+$/, "")) // 行末の空白だけを削除
       .join('\n');
 
     // 2. 相手の呼び名間違いを修正
     processedText = processedText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【完走保証】青1がなければ強制注入
-    if (!processedText.includes("■返信3-青1")) {
+    // 3. 【判定用の正規化】判定ミスを防ぐため、スペースや改行を抜いた状態でチェック
+    const checkText = processedText.replace(/[\s　]/g, "");
+
+    // 4. 【死守ロジック：返信3-青1の強制注入】
+    if (!checkText.includes("■返信3-青1")) {
         processedText += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
     }
 
-    // 4. 【完走保証】完了報告の強制注入
-    if (!processedText.includes("【以上、全項目出力完了】")) {
+    // 5. 【成功保証：完了報告の強制注入】
+    if (!checkText.includes("以上、全項目出力完了")) {
         processedText += "\n\n【以上、全項目出力完了】";
     }
 
