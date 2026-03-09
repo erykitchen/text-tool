@@ -8,11 +8,12 @@ export async function POST(req) {
 
   try {
     const { theme, tone, emoji } = await req.json();
-    const getData = (f) => {
-      const p = path.join(process.cwd(), "data", f);
-      const d = fs.readFileSync(p, "utf8");
-      const l = d.split(/\r?\n/).filter(line => line.trim() !== "");
-      return l[Math.floor(Math.random() * l.length)];
+
+    const getData = (fileName) => {
+      const filePath = path.join(process.cwd(), "data", fileName);
+      const data = fs.readFileSync(filePath, "utf8");
+      const list = data.split(/\r?\n/).filter(line => line.trim() !== "");
+      return list[Math.floor(Math.random() * list.length)];
     };
 
     const name = getData("names.txt");
@@ -24,41 +25,62 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          content: `プロのシナリオライターです。名前は【${name}】固定。返信3まで一文字も省略せず書ききること。全ての文末は「？」にすること。スペースは一切使わず即改行すること。` 
+          // 1. 名前を最優先で固定（名前間違い防止）
+          content: `あなたはプロのシナリオライターです。名前は必ず【${name}】を使用してください。
+【絶対ルール】
+1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
+2. 全てのメッセージの文末は、必ず「？」で終わらせること。
+3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
+4. 全角・半角スペースは一切使用禁止。
+5. 項目11(■返信3-青1)を書き出すまで出力を絶対に止めないこと。` 
         },
         { 
           role: "user", 
-          content: `■名前:${name} / ■職業:${job} / ■性格:${personality} / ■テーマ:${theme} / ■絵文字:${emoji}
-上記設定で、キャラ名から返信3まで、11項目を順番に出力してください。` 
+          // 2. 成功していた時のプロンプト構成を完全復元（青1死守）
+          content: `
+### 【任務】
+以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
+
+■設定: 名前:${name} / 職業:${job} / 性格:${personality} / テーマ:${theme} / 絵文字:${emoji}
+
+■出力シーケンス:
+1. ■キャラ名：${name}
+2. ■プロフィール
+3. ■自己紹介
+4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
+5. 【アタック1〜3】
+6. ■返信1
+7. ■返信1-青1
+8. ■返信2
+9. ■返信2-青1
+10. ■返信3
+11. ■返信3-青1
+12. 【以上、全項目出力完了】`
         }
       ],
       temperature: 0.7,
-      max_tokens: 3000, 
+      max_tokens: 4000, 
     });
 
-    let rawText = completion.choices[0]?.message?.content || "";
+    let result = completion.choices[0]?.message?.content || "";
 
-    // --- 【ここからが「本気」の物理処理】 ---
+    // --- 【ここから「だけ」頑張ります（後処理）】 ---
     
-    // 1. 全ての行を分解し、行末の空白（半角・全角・タブ）を1文字残らず削除
-    let lines = rawText.split('\n').map(line => line.replace(/[ 　\t]+$/, ""));
-    let cleanedText = lines.join('\n').replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
+    // 3. 行末のスペースを物理的に抹殺（スペース削除）
+    result = result.split('\n').map(line => line.replace(/[ 　\t]+$/, "")).join('\n');
 
-    // 2. 【物理溶接】「■返信3-青1」がテキスト内に存在するかチェック（空白無視判定）
-    const flatCheck = cleanedText.replace(/[\s　]/g, "");
-    
-    if (!flatCheck.includes("■返信3-青1")) {
-      // AIがサボった場合、プログラムが「物理的」に末尾にガッチャンコします
-      cleanedText = cleanedText.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
+    // 4. 青1がない場合、物理的に強制追加（青1死守）
+    const checkText = result.replace(/[\s　]/g, "");
+    if (!checkText.includes("■返信3-青1")) {
+        result = result.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
     }
 
-    // 3. 【完了報告】これも物理的に最後尾にロックします
-    cleanedText = cleanedText.trim() + `\n\n【以上、全項目出力完了】`;
+    // 5. 完了報告も物理追加
+    if (!checkText.includes("全項目出力完了")) {
+        result = result.trim() + `\n\n【以上、全項目出力完了】`;
+    }
 
-    // 4. 【最終ダメ押し】返り値の全行に対して、もう一度だけ行末トリムをかける
-    const finalResult = cleanedText.split('\n').map(l => l.replace(/[ 　\t]+$/, "")).join('\n');
-
-    return NextResponse.json({ result: finalResult });
+    return NextResponse.json({ result: result });
 
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
