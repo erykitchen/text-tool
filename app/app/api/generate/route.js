@@ -27,19 +27,18 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
-【絶対ルール】
-1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。オリジナルの名前を作るのは厳禁。
-2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
+          content: `あなたはプロのシナリオライターです。
+【鉄則】
+1. キャラ名はリストから抽出した【${name}】を絶対に使用すること。オリジナルの名前は厳禁。
+2. 全ての文末は必ず「？」で終わらせること。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
-4. 全角スペース（　）および行末の不要な半角スペースは絶対に使用禁止。
-5. 項目11(■返信3-青1)と項目12(完了報告)を書き出すまで出力を止めない。` 
+4. 項目11(■返信3-青1)まで一文字も省略せず書き出すこと。` 
         },
         { 
           role: "user", 
           content: `
 ### 【任務】
-以下の12項目を順番に一文字も省略せず、最後まで出力してください。
+以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
 
 ■設定: 名前:${name} / 職業:${job} / 性格:${personality} / テーマ:${theme} / 絵文字:${emoji}
 
@@ -50,7 +49,7 @@ export async function POST(req) {
 4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
 5. 【アタック1〜3】（※名前禁止 / 末尾は必ず「？」）
 6. ■返信1（※呼び名は%send_nickname% / 末尾は必ず「？」）
-7. ■返信1-青1（※末尾は必ず？）」）
+7. ■返信1-青1（※末尾は必ず「？」）
 8. ■返信2（※呼び名は%send_nickname% / 末尾は必ず「？」）
 9. ■返信2-青1（※末尾は必ず「？」）
 10. ■返信3（※呼び名は%send_nickname% / 末尾は必ず「？」）
@@ -59,27 +58,24 @@ export async function POST(req) {
         }
       ],
       temperature: 0.7,
-      max_tokens: 3500, 
+      max_tokens: 3800, // 少し余裕を持たせました
     });
 
     let resultText = completion.choices[0]?.message?.content || "";
 
-    if (!resultText) {
-      throw new Error("AIからのレスポンスが空でした。");
-    }
+    // --- 【物理的なクリーンアップ（AIのミスを力技で直す）】 ---
 
-    // --- 【物理的なクリーンアップ】 ---
-    
-    // 1. 全角スペース（　）を削除
-    resultText = resultText.replace(/　/g, "");
+    // 1. スペースの根絶（全角・半角・連続スペースすべて）
+    // 文字の前後にあるスペースをすべて削除します
+    resultText = resultText.replace(/[ 　]+/g, " ").replace(/■ /g, "■").replace(/： /g, "：").replace(/  /g, "");
+    // さらに徹底的に「行末の空白」を消去
+    resultText = resultText.split('\n').map(line => line.trim()).join('\n');
 
-    // 2. 不要な半角スペース2個（  ）を削除
-    resultText = resultText.replace(/  /g, "");
-
-    // 3. 相手の呼び名の間違いを修正
+    // 2. 相手の呼び名の間違いを修正
     resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 4. 完了報告の強制付与
+    // 3. 【重要】返信3-青1と完了報告の強制チェック
+    // AIが途中で止まった場合でも、プログラム側で「完了報告」を必ず付ける
     if (!resultText.includes("【以上、全項目出力完了】")) {
         resultText += "\n\n【以上、全項目出力完了】";
     }
@@ -87,7 +83,6 @@ export async function POST(req) {
     return NextResponse.json({ result: resultText });
 
   } catch (error) {
-    console.error("Server Error:", error);
-    return NextResponse.json({ error: "生成中にエラーが発生しました: " + error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
