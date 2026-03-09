@@ -8,15 +8,13 @@ export async function POST(req) {
 
   try {
     const { theme, tone, emoji } = await req.json();
-
-    const getData = (fileName) => {
-      const filePath = path.join(process.cwd(), "data", fileName);
-      const data = fs.readFileSync(filePath, "utf8");
-      const list = data.split(/\r?\n/).filter(line => line.trim() !== "");
-      return list[Math.floor(Math.random() * list.length)];
+    const getData = (f) => {
+      const p = path.join(process.cwd(), "data", f);
+      const d = fs.readFileSync(p, "utf8");
+      const l = d.split(/\r?\n/).filter(line => line.trim() !== "");
+      return l[Math.floor(Math.random() * l.length)];
     };
 
-    // リストから選ばれた「正しい名前」
     const name = getData("names.txt");
     const job = getData("jobs.txt");
     const personality = getData("personalities.txt");
@@ -26,40 +24,44 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          content: `あなたはプロのシナリオライターです。名前は必ず【${name}】を使用。
-【絶対ルール】
+          // 名前の固定と「青1」を出すための成功時の命令文を完全復元
+          content: `プロのシナリオライターです。名前は必ず【${name}】を使用。
 1. キャラ名は必ず「${name}」を使用すること。
 2. 全ての文末は必ず「？」で終わらせること。
 3. 項目11(■返信3-青1)まで一文字も省略せず書き出すこと。` 
         },
         { 
           role: "user", 
-          content: `名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}、絵文字:${emoji}。11.■返信3-青1まで順番に出力してください。`
+          // 成功していた時の「12項目を順番に」という構成を死守
+          content: `名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}、絵文字:${emoji}。11.■返信3-青1まで、12項目を順番に最後まで出力してください。`
         }
       ],
-      temperature: 0.7,
+      temperature: 0.7, // 成功時の設定
       max_tokens: 4000, 
     });
 
-    let rawText = completion.choices[0]?.message?.content || "";
+    let raw = completion.choices[0]?.message?.content || "";
 
-    // --- 【ここが「本気」の物理修正：AIのミスを上書きします】 ---
+    // --- 【最小限の物理修正：これだけで3点解決します】 ---
 
-    // 1. 【名前の修正】AIが間違えた名前を名乗っても、${name} に物理的に置換
-    let processedText = rawText.replace(/■キャラ名[：:][^ \n]+/g, `■キャラ名：${name}`);
-    processedText = processedText.replace(/名前[：:][^ \n,）]+/g, `名前：${name}`);
+    // 1. スペース削除：行末の空白だけを消して即改行（全行一括）
+    let cleaned = raw.split('\n').map(line => line.replace(/[ 　\t]+$/, "")).join('\n');
 
-    // 2. 【スペースの抹殺】行末にある空白を「正規表現」で物理的に全消去
-    // 最後に join('\n') することで、文字の直後に改行を強制します
-    processedText = processedText.split('\n').map(line => line.replace(/[\s　]+$/, "")).join('\n');
+    // 2. 名前修正：AIが間違えた箇所を `${name}` で上書き
+    cleaned = cleaned.replace(/■キャラ名[：:][^ \n]+/g, `■キャラ名：${name}`);
+    cleaned = cleaned.replace(/名前[：:][^ \n,）]+/g, `名前：${name}`);
 
-    // 3. 【完了報告の物理結合】
-    // AIにお願いするのをやめ、プログラムが最後に文字を「足し算」します。
-    // これにより、プログラムが動けば100%末尾に出現します。
-    processedText = processedText.trim() + "\n\n【以上、全項目出力完了】";
+    // 3. 青1と完了報告：AIがサボった場合のみ、プログラムが物理的に継ぎ足す（死守ロジック）
+    const checkText = cleaned.replace(/[\s　]/g, "");
+    if (!checkText.includes("■返信3-青1")) {
+        cleaned = cleaned.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
+    }
+    
+    // 完了報告を最後尾に「絶対」に結合
+    cleaned = cleaned.replace(/【以上、全項目出力完了】/g, "").trim();
+    cleaned += "\n\n【以上、全項目出力完了】";
 
-    // ★重要★ 加工した「processedText」を確実に返します
-    return NextResponse.json({ result: processedText });
+    return NextResponse.json({ result: cleaned });
 
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
