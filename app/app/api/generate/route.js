@@ -27,18 +27,19 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          content: `あなたはプロのシナリオライターです。
-【鉄則】
-1. キャラ名はリストから抽出した【${name}】を絶対に使用すること。オリジナルの名前は厳禁。
-2. 全ての文末は必ず「？」で終わらせること。
+          content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
+【絶対ルール】
+1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
+2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
-4. 項目11(■返信3-青1)まで一文字も省略せず書き出すこと。` 
+4. 全角スペース（　）は絶対に使用禁止。
+5. 項目11(■返信3-青1)と項目12(完了報告)を書き出すまで出力を止めない。` 
         },
         { 
           role: "user", 
           content: `
 ### 【任務】
-以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
+以下の12項目を順番に一文字も省略せず、最後まで出力してください。
 
 ■設定: 名前:${name} / 職業:${job} / 性格:${personality} / テーマ:${theme} / 絵文字:${emoji}
 
@@ -58,24 +59,28 @@ export async function POST(req) {
         }
       ],
       temperature: 0.7,
-      max_tokens: 3800, // 少し余裕を持たせました
+      max_tokens: 3500, 
     });
 
     let resultText = completion.choices[0]?.message?.content || "";
 
-    // --- 【物理的なクリーンアップ（AIのミスを力技で直す）】 ---
+    if (!resultText) {
+      throw new Error("AIからのレスポンスが空でした。");
+    }
 
-    // 1. スペースの根絶（全角・半角・連続スペースすべて）
-    // 文字の前後にあるスペースをすべて削除します
-    resultText = resultText.replace(/[ 　]+/g, " ").replace(/■ /g, "■").replace(/： /g, "：").replace(/  /g, "");
-    // さらに徹底的に「行末の空白」を消去
-    resultText = resultText.split('\n').map(line => line.trim()).join('\n');
+    // --- 【物理的なクリーンアップ（ここだけ追加し、あとは固定）】 ---
+    
+    // 1. 全角スペース（　）と、各行末の不要な半角スペースを削除
+    resultText = resultText.replace(/　/g, "");
+    resultText = resultText.split('\n').map(line => line.trimEnd()).join('\n');
+    
+    // 2. 連続する半角スペース2個（  ）を削除
+    resultText = resultText.replace(/  /g, "");
 
-    // 2. 相手の呼び名の間違いを修正
+    // 3. 相手の呼び名の間違いを修正
     resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【重要】返信3-青1と完了報告の強制チェック
-    // AIが途中で止まった場合でも、プログラム側で「完了報告」を必ず付ける
+    // 4. 完了報告の強制付与（AIが書き漏らした場合の最終保険）
     if (!resultText.includes("【以上、全項目出力完了】")) {
         resultText += "\n\n【以上、全項目出力完了】";
     }
@@ -83,6 +88,7 @@ export async function POST(req) {
     return NextResponse.json({ result: resultText });
 
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Server Error:", error);
+    return NextResponse.json({ error: "生成中にエラーが発生しました: " + error.message }, { status: 500 });
   }
 }
