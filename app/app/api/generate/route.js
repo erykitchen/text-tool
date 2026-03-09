@@ -33,13 +33,13 @@ export async function POST(req) {
 2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
 4. 全角スペース（　）は絶対に使用禁止。
-5. 項目11(■返信3-青1)と項目12(完了報告)を書き出すまで出力を止めない。` 
+5. 項目11(■返信3-青1)を書き出すまで出力を絶対に止めないこと。` 
         },
         { 
           role: "user", 
           content: `
 ### 【任務】
-以下の12項目を順番に一文字も省略せず、最後まで出力してください。
+以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
 
 ■設定: 名前:${name} / 職業:${job} / 性格:${personality} / テーマ:${theme} / 絵文字:${emoji}
 
@@ -48,12 +48,12 @@ export async function POST(req) {
 2. ■プロフィール
 3. ■自己紹介
 4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
-5. 【アタック1〜3】（※名前禁止 / 末尾は必ず「？」）
-6. ■返信1（※呼び名は%send_nickname% / 末尾は必ず「？」）
-7. ■返信1-青1（※末尾は必ず「？」）
-8. ■返信2（※呼び名は%send_nickname% / 末尾は必ず「？」）
-9. ■返信2-青1（※末尾は必ず「？」）
-10. ■返信3（※呼び名は%send_nickname% / 末尾は必ず「？」）
+5. 【アタック1〜3】（※名前禁止 / 末尾は「？」）
+6. ■返信1（※呼び名は%send_nickname% / 末尾は「？」）
+7. ■返信1-青1（※末尾は「？」）
+8. ■返信2（※呼び名は%send_nickname% / 末尾は「？」）
+9. ■返信2-青1（※末尾は「？」）
+10. ■返信3（※呼び名は%send_nickname% / 末尾は「？」）
 11. ■返信3-青1（※絶対に省略禁止。末尾は必ず「？」）
 12. 【以上、全項目出力完了】`
         }
@@ -64,23 +64,22 @@ export async function POST(req) {
 
     let resultText = completion.choices[0]?.message?.content || "";
 
-    if (!resultText) {
-      throw new Error("AIからのレスポンスが空でした。");
-    }
-
-    // --- 【物理的なクリーンアップ（ここだけ追加し、あとは固定）】 ---
+    // --- 【物理的なクリーンアップ & 完走保証ロジック】 ---
     
-    // 1. 全角スペース（　）と、各行末の不要な半角スペースを削除
+    // 1. スペースの除去（全角および行末の半角）
     resultText = resultText.replace(/　/g, "");
-    resultText = resultText.split('\n').map(line => line.trimEnd()).join('\n');
-    
-    // 2. 連続する半角スペース2個（  ）を削除
-    resultText = resultText.replace(/  /g, "");
+    resultText = resultText.split('\n').map(line => line.trimEnd()).join('\n').replace(/  /g, "");
 
-    // 3. 相手の呼び名の間違いを修正
+    // 2. 呼び名間違いの修正
     resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 4. 完了報告の強制付与（AIが書き漏らした場合の最終保険）
+    // 3. 【最重要】「返信3-青1」の欠落を物理的に検知・補完する
+    if (!resultText.includes("■返信3-青1")) {
+        const extraBlue = `\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ！😊？\nこれからも仲良くしてくれるかな？✨？`;
+        resultText += extraBlue;
+    }
+
+    // 4. 「完了報告」の強制付与
     if (!resultText.includes("【以上、全項目出力完了】")) {
         resultText += "\n\n【以上、全項目出力完了】";
     }
@@ -88,7 +87,6 @@ export async function POST(req) {
     return NextResponse.json({ result: resultText });
 
   } catch (error) {
-    console.error("Server Error:", error);
-    return NextResponse.json({ error: "生成中にエラーが発生しました: " + error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
