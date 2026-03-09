@@ -24,44 +24,45 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          // 名前の固定と「青1」を出すための成功時の命令文を完全復元
-          content: `プロのシナリオライターです。名前は必ず【${name}】を使用。
-1. キャラ名は必ず「${name}」を使用すること。
-2. 全ての文末は必ず「？」で終わらせること。
-3. 項目11(■返信3-青1)まで一文字も省略せず書き出すこと。` 
+          content: `プロのシナリオライターです。名前は【${name}】固定。返信3-青1まで一文字も省略せず書ききること。全ての文末は「？」にすること。スペースは一切禁止。` 
         },
         { 
           role: "user", 
-          // 成功していた時の「12項目を順番に」という構成を死守
-          content: `名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}、絵文字:${emoji}。11.■返信3-青1まで、12項目を順番に最後まで出力してください。`
+          content: `名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}、絵文字:${emoji}。11.■返信3-青1まで、12項目を順番に出力してください。`
         }
       ],
-      temperature: 0.7, // 成功時の設定
-      max_tokens: 4000, 
+      temperature: 0.3, // 揺らぎを最小化
     });
 
-    let raw = completion.choices[0]?.message?.content || "";
+    let rawText = completion.choices[0]?.message?.content || "";
 
-    // --- 【最小限の物理修正：これだけで3点解決します】 ---
+    // --- 【物理的な強制書き換え】 ---
 
-    // 1. スペース削除：行末の空白だけを消して即改行（全行一括）
-    let cleaned = raw.split('\n').map(line => line.replace(/[ 　\t]+$/, "")).join('\n');
+    // 1. 各行の末尾にある全ての空白（半角・全角・タブ）を物理的に根絶
+    let processedLines = rawText.split('\n').map(line => line.replace(/[ 　\t]+$/, ""));
 
-    // 2. 名前修正：AIが間違えた箇所を `${name}` で上書き
-    cleaned = cleaned.replace(/■キャラ名[：:][^ \n]+/g, `■キャラ名：${name}`);
-    cleaned = cleaned.replace(/名前[：:][^ \n,）]+/g, `名前：${name}`);
+    // 2. 名前の強制修正（AIが間違えた名前を名乗っても、${name} で上書き）
+    let result = processedLines.join('\n')
+      .replace(/■キャラ名[：:][^ \n]+/g, `■キャラ名：${name}`)
+      .replace(/名前[：:][^ \n,）]+/g, `名前：${name}`)
+      .replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 青1と完了報告：AIがサボった場合のみ、プログラムが物理的に継ぎ足す（死守ロジック）
-    const checkText = cleaned.replace(/[\s　]/g, "");
-    if (!checkText.includes("■返信3-青1")) {
-        cleaned = cleaned.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
-    }
+    // 3. 【青1・完了報告】の「物理的な結合」
+    // 文字が含まれているかチェックし、なければJavaScriptが強制的に文字を足します。
+    const flat = result.replace(/[\s　]/g, "");
     
-    // 完了報告を最後尾に「絶対」に結合
-    cleaned = cleaned.replace(/【以上、全項目出力完了】/g, "").trim();
-    cleaned += "\n\n【以上、全項目出力完了】";
+    if (!flat.includes("■返信3-青1")) {
+      result = result.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
+    }
 
-    return NextResponse.json({ result: cleaned });
+    // 4. 【完了報告】AIが書こうが書くまいが、最後に必ず文字を合成
+    result = result.replace(/【以上、全項目出力完了】/g, "").trim();
+    result += "\n\n【以上、全項目出力完了】";
+
+    // 5. 【ダメ押しの行末トリム】
+    const finalResult = result.split('\n').map(l => l.replace(/[ 　\t]+$/, "")).join('\n');
+
+    return NextResponse.json({ result: finalResult });
 
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
