@@ -23,44 +23,57 @@ export async function POST(req) {
     const selectedPersonality = getData("personalities.txt");
     const selectedJob = getData("jobs.txt");
 
-    // 2. お手本(reference.txt)から1セット選出
+    // 2. お手本(reference.txt)を全体として読み込む
     const refFilePath = path.join(process.cwd(), "data", "reference.txt");
-    const rawRefData = fs.readFileSync(refFilePath, "utf8");
-    const templates = rawRefData.split("***ここから次のデータ***").map(t => t.trim()).filter(t => t !== "");
-    const selectedTemplate = templates[Math.floor(Math.random() * templates.length)];
+    const fullReferenceData = fs.readFileSync(refFilePath, "utf8");
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { 
           role: "system", 
-          content: `あなたはプロのシナリオライターです。名前は必ず「${selectedName}」、職業は「${selectedJob}」、性格は「${selectedPersonality}」として執筆してください。` 
+          content: "あなたはプロのシナリオライターです。提供されるお手本データ群から共通の構成ルールを完璧に把握し、一文字の妥協も許さず、指定された全項目を完遂させることがあなたの絶対的な使命です。" 
         },
         { 
           role: "user", 
           content: `
-### 【今回の創作条件】
-- **名前**: ${selectedName}（※必ずこの名前を使うこと）
-- **職業**: ${selectedJob}
+### 【教育資料：お手本リスト】
+※以下のデータから「構成の型（見出しの順序と種類）」を深く学習せよ。
+${fullReferenceData}
+
+---
+
+### 【プロの執筆任務：完全新作シナリオ】
+お手本の構成を100%維持したまま、以下の設定に基づき、相手を惹きつける魅力的な新作を執筆してください。
+
+■キャラクター設定（厳守）:
+- **名前**: ${selectedName}
 - **性格**: ${selectedPersonality}
-- **追加設定/テーマ**: ${theme}
+- **職業**: ${selectedJob}
+- **追加テーマ**: ${theme}
 - **口調**: ${tone}
 - **絵文字**: ${emoji}
 
-### 【執筆のルール】
-1. **文章の質**: 相手に好印象を与え、仲良くなりたい気持ちが伝わるよう、一文を少し長めに詳しく書いてください。話題を広げつつ、文の最後は必ず「相手のこと」を聞く疑問形で締めてください。
-2. **形式の死守**: 見出し（■返信3-青1など）の構成はお手本と一字一句同じにし、最後の一文字まで絶対に省略しないでください。
-3. **中身の創作**: お手本の文章をコピーせず、上記の設定に基づいて新しい内容で執筆してください。
+■執筆の鉄則:
+1. **文章の品質**: 相手に好印象を与え、もっと話したいと思わせるよう、話題を広げつつ一文を少し長めに詳しく書いてください。
+2. **対話の継続**: **すべての文章の最後は、必ず相手のことを聞く「疑問形（？）」で締めてください。**
+3. **完走の義務**: お手本にある「■返信3」で満足せず、必ず最終項目【■返信3-青1】まで一気呵成に書き上げること。
 
-【お手本フォーマット（構成のみを継承）】
-${selectedTemplate}
+■必須出力項目リスト（順番通りに最後まで）:
+1. ■キャラ名 〜 ■自己紹介
+2. キャラ設定（カップ数 〜 インスタURL）
+3. 【アタック1】〜【アタック3】
+4. ■返信1、■返信1-青1
+5. ■返信2、■返信2-青1
+6. ■返信3
+7. ■返信3-青1（←ここが真のゴールです。絶対に省略不可）
 
-### 【出力の鉄則】
-必ず「■返信3-青1」まで到達してください。最後に「【以上、全項目出力完了】」と記載して終了せよ。` 
+### 【最終検品指示】
+プロとして、最後の「■返信3-青1」が書き出されていることを目視確認し、最後に「【以上、全項目出力完了】」と記載して送信せよ。` 
         }
       ],
       temperature: 0.8,
-      max_tokens: 3500,
+      max_tokens: 4000,
     });
 
     return NextResponse.json({ result: completion.choices[0].message.content });
