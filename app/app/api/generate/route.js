@@ -29,11 +29,11 @@ export async function POST(req) {
           role: "system", 
           content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
-1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
-2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
+1. キャラ名は必ずリストから抽出された「${name}」を使用。
+2. 全てのセリフの文末は、必ず「？」で終わらせること。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
 4. 全角スペース（　）は絶対に使用禁止。
-5. 項目11(■返信3-青1)を書き出すまで出力を絶対に止めないこと。` 
+5. 項目11(■返信3-青1)まで一文字も省略せず、最後まで書き出すこと。` 
         },
         { 
           role: "user", 
@@ -64,24 +64,23 @@ export async function POST(req) {
 
     let rawText = completion.choices[0]?.message?.content || "";
 
-    // --- 【後処理：ここが生命線です】 ---
+    // --- 【物理クリーンアップ：ここをさらに強化しました】 ---
     
-    // 1. 各行の末尾にある不要なスペース（半角・全角）だけを削除し、即改行させる
+    // 1. 各行の末尾にある「全ての空白文字」を削除（トリム）して即改行
     let finalText = rawText.split('\n')
-      .map(line => line.replace(/[ 　\t]+$/, "")) 
+      .map(line => line.replace(/[\s　]+$/, "")) // 行末のあらゆる空白（全角含む）を完全に消す
       .join('\n');
 
-    // 2. 相手の呼び名間違いを修正
+    // 2. 呼び名間違いを修正
     finalText = finalText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【青1・完了報告の死守ロジック】
-    // スペースの有無に左右されないよう、一時的に空白を消した状態でチェック
-    const dryRunCheck = finalText.replace(/[\s　]/g, "");
+    // 3. 【完走保証】空白を抜いた状態でチェックし、なければ物理注入
+    const checkTarget = finalText.replace(/[\s　]/g, "");
 
-    if (!dryRunCheck.includes("■返信3-青1")) {
+    if (!checkTarget.includes("■返信3-青1")) {
         finalText += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
     }
-    if (!dryRunCheck.includes("全項目出力完了")) {
+    if (!checkTarget.includes("全項目出力完了")) {
         finalText += "\n\n【以上、全項目出力完了】";
     }
 
