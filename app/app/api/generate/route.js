@@ -1,5 +1,7 @@
 import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req) {
   const openai = new OpenAI({
@@ -7,52 +9,52 @@ export async function POST(req) {
   });
 
   try {
-    const { theme, tone, emoji, template } = await req.json();
+    const { theme, tone, emoji } = await req.json();
+
+    // --- 1. 名前リスト(names.txt)を読み込む ---
+    const namesFilePath = path.join(process.cwd(), "data", "names.txt");
+    const namesData = fs.readFileSync(namesFilePath, "utf8");
+    const nameList = namesData.split(/\r?\n/).filter(line => line.trim() !== "");
+    const selectedName = nameList[Math.floor(Math.random() * nameList.length)];
+
+    // --- 2. お手本(reference.txt)を読み込む ---
+    const refFilePath = path.join(process.cwd(), "data", "reference.txt");
+    const template = fs.readFileSync(refFilePath, "utf8");
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { 
           role: "system", 
-          content: "あなたはプロのシナリオライターであり、一文字の欠落も許さない検品官です。提供されたお手本の項目を【末尾の最後の一文字まで】完全に再現して出力してください。" 
+          content: "あなたはプロのシナリオライターであり、フォーマット遵守の専門家です。お手本の全項目を最後の一文字まで再現することがあなたの絶対的な責務です。" 
         },
         { 
           role: "user", 
           content: `
-### 【名前の絶対ルール】
-- 日本の女優の下の名前を参考に「漢字表記」と「ひらがな表記」を完全にランダムで選べ。
-- 「美波」「結衣」「すず」「かすみ」「奈緒」「芽郁」「環奈」「ありす」など、ひらがな固定をやめ、漢字を積極的に混ぜること。
+### 【キャラクター設定指示】
+- **今回の名前**: 「${selectedName}」を必ず使用してください。
+- **テーマ**: ${theme}
+- **口調**: ${tone}
+- **絵文字**: ${emoji}
 
-### 【執筆完了の条件（省略は不合格）】
-現在、最後の「■返信3-青1」が欠落する重大なエラーが発生しています。
-プロのライターとして、以下の【全チェックリスト】を物理的に最後まで書き出すことが今回の任務です。
-
-■全チェックリスト（この順に全て埋めること）:
-1. ■キャラ名 〜 ■自己紹介
-2. キャラ設定（カップ数 〜 インスタURL）
-3. 【アタック1】〜【アタック3】
-4. ■返信1、■返信1-青1
-5. ■返信2、■返信2-青1
-6. ■返信3
-7. ■返信3-青1（←ここが最大の難所です。絶対に書き漏らさないでください）
-
-テーマ: ${theme}
-口調: ${tone}
-絵文字: ${emoji}
+### 【出力の鉄の掟（省略は厳禁）】
+プロのライターとして、以下のお手本フォーマットを【1文字も漏らさず】、必ず末尾の「■返信3-青1」まで書き切ってください。
+途中で文章をまとめたり、最後の項目を削ることは絶対に許されません。
 
 【お手本フォーマット】
 ${template}
 
 ### 【最終確認】
-最後の「■返信3-青1」を書き終えるまで、絶対に筆を置かないでください。` 
+最後の「■返信3-青1」まで全て出力されていることを確認し、最後に「【以上、全項目出力完了】」と添えて送信せよ。` 
         }
       ],
-      temperature: 0.9, 
-      max_tokens: 3800, // 余裕を持って4000手前まで拡張
+      temperature: 0.7,
+      max_tokens: 3500,
     });
 
     return NextResponse.json({ result: completion.choices[0].message.content });
   } catch (error) {
+    console.error("Error details:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
