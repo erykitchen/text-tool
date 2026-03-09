@@ -16,6 +16,7 @@ export async function POST(req) {
       return list[Math.floor(Math.random() * list.length)];
     };
 
+    // リストから取得した名前。これを最後まで使い倒します。
     const name = getData("names.txt");
     const job = getData("jobs.txt");
     const personality = getData("personalities.txt");
@@ -25,8 +26,8 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          // 1. 名前を最優先で固定（名前間違い防止）
-          content: `あなたはプロのシナリオライターです。名前は必ず【${name}】を使用してください。
+          // ここは「青1」が出た時の指示を1文字も変えずに死守
+          content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
 1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
 2. 全てのメッセージの文末は、必ず「？」で終わらせること。
@@ -36,7 +37,7 @@ export async function POST(req) {
         },
         { 
           role: "user", 
-          // 2. 成功していた時のプロンプト構成を完全復元（青1死守）
+          // ここも成功パターンを完全死守
           content: `
 ### 【任務】
 以下の12項目を「順番に一文字も省略せず」、最後まで出力してください。
@@ -64,21 +65,31 @@ export async function POST(req) {
 
     let result = completion.choices[0]?.message?.content || "";
 
-    // --- 【ここから「だけ」頑張ります（後処理）】 ---
-    
-    // 3. 行末のスペースを物理的に抹殺（スペース削除）
+    // --- 【ここから下の「物理掃除」だけで3点を治します】 ---
+
+    // 【1. 名前の修正】AIがもし違う名前を出しても、リストの名前 ${name} に強制置換
+    // （※キャラ設定などの自由記述欄も守るため、行の先頭付近にある名前表記を狙い撃ちします）
+    result = result.replace(/■キャラ名[：:][^ \n]+/g, `■キャラ名：${name}`);
+    result = result.replace(/名前[：:][^ \n,）]+/g, `名前：${name}`);
+
+    // 【2. スペースの削除】各行の末尾にある空白（半角・全角）を物理的に根絶
     result = result.split('\n').map(line => line.replace(/[ 　\t]+$/, "")).join('\n');
 
-    // 4. 青1がない場合、物理的に強制追加（青1死守）
+    // 呼び名修正（これは保険）
+    result = result.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
+
+    // 【3. 完了報告と青1の死守】
     const checkText = result.replace(/[\s　]/g, "");
+    
+    // 青1がなければ物理追加（ここも死守）
     if (!checkText.includes("■返信3-青1")) {
         result = result.trim() + `\n\n■返信3-青1\nこれからももっと仲良くなれたら嬉しいなって思ってるよ？😊？`;
     }
 
-    // 5. 完了報告も物理追加
-    if (!checkText.includes("全項目出力完了")) {
-        result = result.trim() + `\n\n【以上、全項目出力完了】`;
-    }
+    // 完了報告を「確実に」最後に付与
+    // 一度消してから足すことで、二重にならず、かつ必ず最後に来るようにします。
+    result = result.replace(/【以上、全項目出力完了】/g, "").trim();
+    result += "\n\n【以上、全項目出力完了】";
 
     return NextResponse.json({ result: result });
 
