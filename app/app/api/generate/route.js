@@ -11,11 +11,17 @@ export async function POST(req) {
   try {
     const { theme, tone, emoji } = await req.json();
 
-    // 1. 名前リスト(names.txt)から選出
-    const namesFilePath = path.join(process.cwd(), "data", "names.txt");
-    const namesData = fs.readFileSync(namesFilePath, "utf8");
-    const nameList = namesData.split(/\r?\n/).filter(line => line.trim() !== "");
-    const selectedName = nameList[Math.floor(Math.random() * nameList.length)];
+    // 1. 各データファイルを読み込んでランダム選出
+    const getData = (fileName) => {
+      const filePath = path.join(process.cwd(), "data", fileName);
+      const data = fs.readFileSync(filePath, "utf8");
+      const list = data.split(/\r?\n/).filter(line => line.trim() !== "");
+      return list[Math.floor(Math.random() * list.length)];
+    };
+
+    const selectedName = getData("names.txt");
+    const selectedPersonality = getData("personalities.txt");
+    const selectedJob = getData("jobs.txt");
 
     // 2. お手本(reference.txt)から1セット選出
     const refFilePath = path.join(process.cwd(), "data", "reference.txt");
@@ -28,30 +34,32 @@ export async function POST(req) {
       messages: [
         { 
           role: "system", 
-          content: "あなたはプロのシナリオライターです。お手本の『形式（見出しの順序）』を完全に守りつつ、内容は『新しいテーマ』に沿ってゼロから創作してください。コピーではなく、完全な新作を書くことがあなたの仕事です。" 
+          content: `あなたはプロのシナリオライターです。名前は必ず「${selectedName}」、職業は「${selectedJob}」、性格は「${selectedPersonality}」として執筆してください。` 
         },
         { 
           role: "user", 
           content: `
 ### 【今回の創作条件】
-- **名前**: 「${selectedName}」を使用せよ
-- **テーマ**: ${theme}
+- **名前**: ${selectedName}（※必ずこの名前を使うこと）
+- **職業**: ${selectedJob}
+- **性格**: ${selectedPersonality}
+- **追加設定/テーマ**: ${theme}
 - **口調**: ${tone}
 - **絵文字**: ${emoji}
 
 ### 【執筆のルール】
-1. **中身の創作**: 【お手本】の文章をコピーせず、上記のテーマに基づいた「新しいセリフや設定」を執筆してください。
-2. **形式の死守**: 見出し（■返信3-青1など）の構成はお手本と一字一句同じにしてください。
-3. **完走命令**: 最後の【■返信3-青1】まで、絶対に省略せずに書き切ること。
+1. **文章の質**: 相手に好印象を与え、仲良くなりたい気持ちが伝わるよう、一文を少し長めに詳しく書いてください。話題を広げつつ、文の最後は必ず「相手のこと」を聞く疑問形で締めてください。
+2. **形式の死守**: 見出し（■返信3-青1など）の構成はお手本と一字一句同じにし、最後の一文字まで絶対に省略しないでください。
+3. **中身の創作**: お手本の文章をコピーせず、上記の設定に基づいて新しい内容で執筆してください。
 
-【お手本フォーマット（この構成を真似て中身を新しく書く）】
+【お手本フォーマット（構成のみを継承）】
 ${selectedTemplate}
 
-### 【最終確認】
-プロのライターとして、${theme}に沿ったオリジナルの内容で、最後の「■返信3-青1」まで全て出力されていることを確認し、最後に「【以上、全項目出力完了】」と添えて送信せよ。` 
+### 【出力の鉄則】
+必ず「■返信3-青1」まで到達してください。最後に「【以上、全項目出力完了】」と記載して終了せよ。` 
         }
       ],
-      temperature: 0.8, // 創作性を高めるために少し上げました
+      temperature: 0.8,
       max_tokens: 3500,
     });
 
