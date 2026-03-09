@@ -30,10 +30,10 @@ export async function POST(req) {
           content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
 1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。
-2. 全てのセリフの文末は、必ず「？」で終わらせること。
+2. 全てのセリフの文末は、必ず「？」で終わらせること（例：😊？）。
 3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
-4. 全角・半角スペースは一切使用禁止。
-5. 項目11(■返信3-青1)まで一文字も省略せず、最後まで書き出すこと。` 
+4. 全角スペース（　）は絶対に使用禁止。
+5. 項目11(■返信3-青1)まで一文字も省略せず、最後まで書き切ること。` 
         },
         { 
           role: "user", 
@@ -62,29 +62,29 @@ export async function POST(req) {
       max_tokens: 4000, 
     });
 
-    let resultText = completion.choices[0]?.message?.content || "";
+    let rawText = completion.choices[0]?.message?.content || "";
 
-    // --- 【物理的なクリーンアップ（ここを最強にしました）】 ---
+    // --- 【物理的なクリーンアップ：改行前のスペースのみ削除】 ---
     
-    // 1. 【スペースの完全消滅】
-    // \s は半角スペース、全角スペース、タブ、改行など全てを含みます。
-    // ここでは「改行(\n)以外のすべての空白」を物理的にゼロにします。
-    resultText = resultText.replace(/[ 　\t\r\f\v]/g, "");
+    // 1. 各行をループして、行末のスペース（半角・全角）だけを削除して即改行
+    let processedText = rawText.split('\n')
+      .map(line => line.replace(/[ 　\t]+$/, "")) // 行末（$）の空白だけを消す
+      .join('\n');
 
-    // 2. 相手の呼び名間違い（○○くん等）を修正
-    resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
+    // 2. 相手の呼び名間違いを修正
+    processedText = processedText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 【完走保証】青1の物理検知・補完
-    if (!resultText.includes("■返信3-青1")) {
-        resultText += `\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
+    // 3. 【完走保証】青1がなければ強制注入
+    if (!processedText.includes("■返信3-青1")) {
+        processedText += `\n\n■返信3-青1\nこれから少しずつ、%send_nickname%のことをもっと知っていけたら嬉しいなって思ってるよ？😊？`;
     }
 
-    // 4. 【完走保証】完了報告の強制付与
-    if (!resultText.includes("【以上、全項目出力完了】")) {
-        resultText += "\n\n【以上、全項目出力完了】";
+    // 4. 【完走保証】完了報告の強制注入
+    if (!processedText.includes("【以上、全項目出力完了】")) {
+        processedText += "\n\n【以上、全項目出力完了】";
     }
 
-    return NextResponse.json({ result: resultText });
+    return NextResponse.json({ result: processedText });
 
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
