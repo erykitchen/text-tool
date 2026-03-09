@@ -29,10 +29,11 @@ export async function POST(req) {
           role: "system", 
           content: `あなたはプロのシナリオライターです。名前は【${name}】で固定。
 【絶対ルール】
-1. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
-2. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
-3. 全角スペース（　）は絶対に使用禁止。
-4. 項目11(■返信3-青1)と項目12(完了報告)を書き出すまで出力を止めない。` 
+1. キャラ名は必ずリストから抽出された「${name}」をそのまま使用すること。オリジナルの名前を作るのは厳禁。
+2. 全てのメッセージの文末は、必ず「？」で終わらせること（例：😊？）。
+3. 相手は「%send_nickname%」と呼び、アタック1〜3では名前を絶対に呼ばない。
+4. 全角スペース（　）および行末の不要な半角スペースは絶対に使用禁止。
+5. 項目11(■返信3-青1)と項目12(完了報告)を書き出すまで出力を止めない。` 
         },
         { 
           role: "user", 
@@ -49,7 +50,7 @@ export async function POST(req) {
 4. キャラ設定（名前:${name}、職業:${job}、性格:${personality}、テーマ:${theme}）
 5. 【アタック1〜3】（※名前禁止 / 末尾は必ず「？」）
 6. ■返信1（※呼び名は%send_nickname% / 末尾は必ず「？」）
-7. ■返信1-青1（※末尾は必ず「？」）
+7. ■返信1-青1（※末尾は必ず？）」）
 8. ■返信2（※呼び名は%send_nickname% / 末尾は必ず「？」）
 9. ■返信2-青1（※末尾は必ず「？」）
 10. ■返信3（※呼び名は%send_nickname% / 末尾は必ず「？」）
@@ -61,22 +62,24 @@ export async function POST(req) {
       max_tokens: 3500, 
     });
 
-    // レスポンスが存在するかチェック（エラー防止）
     let resultText = completion.choices[0]?.message?.content || "";
 
     if (!resultText) {
       throw new Error("AIからのレスポンスが空でした。");
     }
 
-    // --- 【物理的なクリーンアップ（ロジック固定）】 ---
+    // --- 【物理的なクリーンアップ】 ---
     
-    // 1. 全角スペース（　）をすべて削除
+    // 1. 全角スペース（　）を削除
     resultText = resultText.replace(/　/g, "");
 
-    // 2. 相手の呼び名の間違いを修正
+    // 2. 不要な半角スペース2個（  ）を削除
+    resultText = resultText.replace(/  /g, "");
+
+    // 3. 相手の呼び名の間違いを修正
     resultText = resultText.replace(/○○くん|○○さん|あなた|君/g, "%send_nickname%");
 
-    // 3. 完了報告の強制付与
+    // 4. 完了報告の強制付与
     if (!resultText.includes("【以上、全項目出力完了】")) {
         resultText += "\n\n【以上、全項目出力完了】";
     }
@@ -85,7 +88,6 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("Server Error:", error);
-    // クライアント側にエラー内容を返す
     return NextResponse.json({ error: "生成中にエラーが発生しました: " + error.message }, { status: 500 });
   }
 }
