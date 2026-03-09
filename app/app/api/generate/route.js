@@ -9,7 +9,6 @@ export async function POST(req) {
   try {
     const { theme, tone, emoji, template } = await req.json();
 
-    // 修正済み：メソッドの呼び出しを正しい形に直しました
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -21,11 +20,16 @@ export async function POST(req) {
           role: "user", 
           content: `
 ### 【執筆命令：絶対遵守】
-プロのシナリオライターとして、お手本にある全ての項目を【1つも省略せず】、末尾の「■返信3-青1」まで書き切ってください。
+プロのシナリオライターとして、以下の項目を【1つも省略せず】、必ず「■返信3-青1」まで書き切ってください。
+たとえ【お手本】の中に項目が足りない場合でも、以下の構成を最優先して作成すること。
 
-1. お手本のフォーマットを【1文字も漏らさず】最初から最後まで完コピせよ。
-2. 特に末尾の【■返信3-青1】などの項目を絶対に省略せず、すべて出力せよ。
-3. 全項目を書き終えたら、最後の一行に必ず「【以上、全項目出力完了】」と記載せよ。
+■必須構成リスト:
+1. ■キャラ名 〜 ■自己紹介
+2. キャラ設定（カップ数 〜 使用場所タグ、インスタURL）
+3. 【アタック1】〜【アタック3】
+4. ■返信1、■返信1-青1
+5. ■返信2、■返信2-青1
+6. ■返信3、■返信3-青1（←ここを絶対に忘れないこと）
 
 テーマ: ${theme}
 口調: ${tone}
@@ -39,7 +43,7 @@ ${template}
         }
       ],
       temperature: 0.7,
-      max_tokens: 3500, // 末尾まで余裕を持って書き切るための設定
+      max_tokens: 3500,
     });
 
     return NextResponse.json({ result: completion.choices[0].message.content });
